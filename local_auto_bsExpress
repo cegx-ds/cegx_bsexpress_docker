@@ -1,26 +1,70 @@
 #!/bin/bash
 
+#-----------------------------------------------------------------------------#
+# Cambridge Epigenetix                                                        #
+#-----------------------------------------------------------------------------#
+# local_auto_bsExpress                                                        #
+# Script to find fastq.gz files in the current directory and run two          #
+# dockerised versions of bsExpress. One for the Digestion Control (DC) and    #
+# one for the spike in controls (SC)                                          #
+#-----------------------------------------------------------------------------#
+# Version: 0.5 (December 2015)                                                #
+# Author:  Russell Hamilton russell@cegx.co.uk                                #
+#-----------------------------------------------------------------------------#
+
+
+#
+# Function to gracefully catch failed docker runs
+#
+run() {
+  $*
+  if [ $? -ne 0 ]
+  then
+    echo "$* failed with exit code probably because the controls are not found in the fastq file: $?"
+    return 0
+  else
+    return 0
+  fi
+}
+
 #
 # Get the local machine pwd
 #
-
 currentdir=$(pwd)
 
-
+#
+# Read in the fastq.gz file names in the current dir
+#
 declare -a filearray=( *R1*.fastq.gz )
 
+#
+# Exit with error statement of there are no fastq.gz files in the filearray
+#
+numFQ=${#filearray[@]}
+
+if [ "$numFQ" -le "1" ]
+then
+  echo "ERROR: No fastq.gz files found in this directory!"
+  echo " Hints: "
+  echo "  - Are you in the correct dir?"
+  echo "  - Are the fastq files uncompressed?"
+  echo "  - Are the fastq.gz files named in the format *R1*.fastq.gz?"
+  exit
+fi
+
+#
+# Loop through the fastq.gz files
+#
 for i in "${filearray[@]}"
 do
         NAME=${i/.fastq.gz/}
 
-        echo "Running bsExpress SQ for ${i}"
-        #docker run -v=$(pwd)/:/Data -it dkr_bsexpress-0.5cegx bsExpress -i /Data/${i} -r /cegx_bsexpress/control_reference/oxBS_controls-v1.0.fa -p $NAME.runqc_SQ --outdir /Data/$NAME.runqc_SQ --maxlen 60 --skip_fastqc 
+        echo "+ Running bsExpress SQ for ${i}"
         docker run -v=$currentdir:/Data -it cegx_bsexpress_0.5 bsExpress -i /Data/${i} -r /cegx_bsexpress/control_reference/oxBS_controls-v1.0.fa -p $NAME.runqc_SQ --outdir /Data/$NAME.runqc_SQ --maxlen 60 --skip_fastqc
         #--verbose
 
-        echo "Running bsExpress DC for ${i}"
-        #docker run -v=$(pwd)/:/Data -it dkr_bsexpress-0.5cegx bsExpress -i /Data/${i} -r /cegx_bsexpress/digestion_reference/DC_controls-v1.0.fa -p $NAME.runqc_DC --outdir /Data/$NAME.runqc_DC --maxlen 100 --skip_fastqc 
-        docker run -v=$currentdir:/Data -it cegx_bsexpress_0.5 bsExpress -i /Data/${i} -r /cegx_bsexpress/digestion_reference/DC_controls-v1.0.fa -p $NAME.runqc_DC --outdir /Data/$NAME.runqc_DC --maxlen 100 --skip_fastqc
+        echo "+ Running bsExpress DC for ${i}"
+        run docker run -v=$currentdir:/Data -it dkr_bsexpress-0.5cegx bsExpress -i /Data/${i} -r /cegx_bsexpress/digestion_reference/DC_controls-v1.0.fa -p $NAME.runqc_DC --outdir /Data/$NAME.runqc_DC --maxlen 100 --skip_fastqc 
         #--verbose
 
         echo
@@ -30,11 +74,13 @@ do
         # Code below here is just printing out a top level summary
         #
         echo "bsExpress Results Summary for ${i}"
+
         declare -a controls=( "SQ" "DC" )
+
         for j in "${controls[@]}"
            do
-              echo "${j} controls results being written to $NAME.${j}.bsExpressSummary.txt"
-              echo "${j} controls" > /Data/$NAME.${j}.bsExpressSummary.txt
+              echo "${j} controls results being written to $NAME.runqc_${j}/$NAME.${j}.bsExpressSummary.txt"
+              echo "${j} controls" > /Data/$NAME.runqc_${j}/$NAME.${j}.bsExpressSummary.txt
         
               ALLRDS=`grep 'Total reads processed:' /Data/$NAME.runqc_${j}/$NAME.fastq.gz_trimming_report.txt | sed 's/.*://g' | sed 's/,//g' | sed 's/ //g' | sed 's/\t//g'`
               SEQALN=`grep 'Sequences analysed in total:' /Data/$NAME.runqc_${j}/$NAME.runqc_${j}.R1.short.fq.gz_bismark_bt2_SE_report.txt | sed 's/.*://g' | sed 's/ //g' | sed 's/\t//g'`
