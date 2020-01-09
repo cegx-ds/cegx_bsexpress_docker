@@ -51,4 +51,4 @@ Please refer to the `cegx_bsexpress_0.5_Instructions.pdf` document for full inst
 
 ## Getting help ##
 
-Please contact [bfx@cegx.co.uk](mailto:bfx@cegx.co.uk) if you reguire assistance or have any questions
+Please contact [informatics@cegx.co.uk](mailto:informatics@cegx.co.uk) if you reguire assistance or have any questions
